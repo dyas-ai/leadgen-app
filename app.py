@@ -1,69 +1,88 @@
 import streamlit as st
 import pandas as pd
 import random
-import time
-import json
 
-st.set_page_config(page_title="LeadGen AI", page_icon="🚀", layout="wide")
+# -------------- CONFIG --------------
+st.set_page_config(page_title="LeadGen AI", page_icon="⚡", layout="wide")
 
-# ----- MOCK LEAD DATABASE -----
-def generate_mock_leads(industry, count=10):
-    first_names = ["Arjun", "Priya", "Neha", "Ravi", "Karan", "Ananya", "Suresh", "Ishita"]
-    last_names = ["Sharma", "Verma", "Singh", "Patel", "Gupta", "Rao", "Mehta", "Bansal"]
-    companies = ["Techify", "Designo", "BrandNest", "GrowthHub", "PixelWorks", "CloudIQ", "Finverse", "AI Labs"]
-    roles = ["Marketing Manager", "CEO", "CTO", "Designer", "Growth Head", "Analyst", "Sales Lead"]
+# -------------- SIDEBAR --------------
+with st.sidebar:
+    st.title("📁 Lead History")
+    st.markdown("View your saved and recent lead batches below.")
+    
+    if "saved_leads" not in st.session_state:
+        st.session_state.saved_leads = {}
 
+    if st.session_state.saved_leads:
+        for batch, df in st.session_state.saved_leads.items():
+            with st.expander(f"📄 {batch}"):
+                st.dataframe(df)
+    else:
+        st.info("No saved leads yet.")
+
+# -------------- MAIN UI --------------
+st.markdown("<h2 style='text-align:center;'>⚡ LeadGen AI</h2>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;'>Smart lead generation & scoring assistant</p>", unsafe_allow_html=True)
+st.divider()
+
+# Wizard-like Input
+st.markdown("### 💬 Ask LeadGen AI")
+user_prompt = st.text_area("Describe the type of leads you want:", 
+                           placeholder="e.g. I want SaaS startup leads in India targeting growth managers...")
+
+col1, col2 = st.columns([1, 4])
+with col1:
+    num_leads = st.slider("Number of leads", 5, 50, 10)
+with col2:
+    criteria = st.multiselect("Scoring criteria", ["Relevance", "Engagement", "Conversion Potential"], ["Relevance"])
+
+generate_btn = st.button("⚡ Generate Leads")
+
+# Optional Quick Prompts
+st.markdown("#### 🧠 Try these prompts:")
+sample_prompts = [
+    "I want ecommerce founders in India",
+    "Generate B2B SaaS leads in US",
+    "Find marketing heads in D2C companies"
+]
+cols = st.columns(len(sample_prompts))
+for i, p in enumerate(sample_prompts):
+    if cols[i].button(p):
+        user_prompt = p
+        st.session_state["last_prompt"] = p
+        generate_btn = True
+
+# -------------- LEAD GENERATION --------------
+def generate_fake_leads(n, industry="General"):
+    names = ["Aarav", "Isha", "Karan", "Neha", "Priya", "Suresh", "Ananya", "Rohit"]
+    companies = ["Techify", "GrowthHub", "BrandNest", "CloudIQ", "Designo"]
+    roles = ["CEO", "Marketing Head", "Growth Lead", "Analyst", "Designer", "Sales Lead"]
+    
     leads = []
-    for _ in range(count):
+    for _ in range(n):
         lead = {
-            "Name": f"{random.choice(first_names)} {random.choice(last_names)}",
+            "Name": random.choice(names) + " " + random.choice(["Singh", "Rao", "Bansal"]),
             "Company": random.choice(companies),
             "Role": random.choice(roles),
             "Industry": industry,
-            "Email": f"{first_names[random.randint(0, len(first_names)-1)].lower()}@{random.choice(companies).lower()}.com",
+            "Email": f"{random.choice(names).lower()}@{random.choice(companies).lower()}.com",
             "Score": random.randint(50, 100)
         }
         leads.append(lead)
     return pd.DataFrame(leads)
 
-# ----- APP HEADER -----
-st.title("🚀 LeadGen AI")
-st.caption("Smart lead generation + scoring assistant")
-
-# ----- SIDEBAR INPUTS -----
-st.sidebar.header("🎯 Lead Search Parameters")
-industry = st.sidebar.text_input("Target Industry", placeholder="e.g. SaaS, Fitness, E-commerce")
-lead_count = st.sidebar.slider("Number of Leads", 5, 50, 10)
-scoring_criteria = st.sidebar.multiselect(
-    "Scoring Criteria",
-    ["Company Size", "Engagement", "Relevance", "Budget Potential"],
-    default=["Relevance", "Budget Potential"]
-)
-
-if st.sidebar.button("Generate Leads"):
-    with st.spinner("Fetching and scoring leads..."):
-        time.sleep(2)
-        leads_df = generate_mock_leads(industry, lead_count)
-        st.session_state["leads"] = leads_df
-        st.success("✅ Leads Generated Successfully!")
-
-# ----- MAIN DISPLAY -----
-if "leads" in st.session_state:
-    st.subheader("📋 Generated Leads")
-    st.dataframe(st.session_state["leads"], use_container_width=True)
-
-    # Save leads section
+# Generate and Display Leads
+if generate_btn and user_prompt:
+    st.success("✅ Leads Generated Successfully!")
+    df = generate_fake_leads(num_leads, user_prompt)
+    
+    st.markdown("### 🧾 Generated Leads")
+    st.dataframe(df, use_container_width=True)
+    
     if st.button("💾 Save This Lead List"):
-        saved = st.session_state.get("saved_leads", [])
-        saved.append(st.session_state["leads"].to_dict(orient="records"))
-        st.session_state["saved_leads"] = saved
-        st.success("Leads saved!")
+        batch_name = f"Batch {len(st.session_state.saved_leads) + 1}"
+        st.session_state.saved_leads[batch_name] = df
+        st.toast(f"Saved as {batch_name}")
 
-# ----- SAVED LEADS SECTION -----
-st.subheader("📂 Saved Lead Data")
-if "saved_leads" in st.session_state and len(st.session_state["saved_leads"]) > 0:
-    for i, lead_batch in enumerate(st.session_state["saved_leads"]):
-        st.markdown(f"**Lead Batch {i+1}:**")
-        st.dataframe(pd.DataFrame(lead_batch), use_container_width=True)
-else:
-    st.info("No leads saved yet. Generate and save to view here.")
+elif not user_prompt and generate_btn:
+    st.warning("⚠️ Please enter a prompt to generate leads.")
